@@ -1,0 +1,64 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Device is already configured"
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error",
+      "timeout": "Couldn't reach the Charger endpoint, check if charger web interface is running, or if the URL is correct"
+    },
+    "step": {
+      "user": {
+        "title": "Chuck charger",
+        "description": "Configure",
+        "data": {
+          "friendly_name": "Charger name",
+          "base_url": "Charger base url",
+          "auth_user": "Charger api user",
+          "auth_pass": "Charger api password",
+          "cfg_phase_order_conn1": "Chargebox physical phase order (connector 1)",
+          "cfg_phase_order_conn2": "Chargebox physical phase order (connector 2)",
+          "_have_net_current_sensor": "External NET power sensor",
+          "have_net_current_sensor": "Charger is equipped with a sensor for measuring net current",
+          "is_connected_to_ocpp": "Charger is connected to OCPP gateway",
+          "add_another_charger": "Add another charger"
+        },
+        "data_description": {
+          "is_connected_to_ocpp" : "If checked, a button for starting transactions will be added."
+        }
+      }
+    }
+  },
+  "options": {
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error",
+      "timeout": "Couldn't reach the Charger endpoint, check if charger web interface is running, or if the URL is correct"
+    },
+    "step": {
+      "init": {
+        "title": "Chuck charger",
+        "description": "Configure",
+        "data": {
+          "friendly_name": "Charger name",
+          "base_url": "Charger base url",
+          "auth_user": "Charger api user",
+          "auth_pass": "Charger api password",
+          "cfg_phase_order_conn1": "Chargebox physical phase order (connector 1)",
+          "cfg_phase_order_conn2": "Chargebox physical phase order (connector 2)",
+          "_have_net_current_sensor": "External NET power sensor",
+          "have_net_current_sensor": "Charger is equipped with a sensor for measuring net current",
+          "is_connected_to_ocpp": "Charger is connected to a OCPP gateway",
+          "add_another_charger": "Add another charger"
+        },
+        "data_description": {
+
+          "is_connected_to_ocpp" : "If checked, a button for starting transactions will be added."
+        }
+      }
+    }
+  }
+}

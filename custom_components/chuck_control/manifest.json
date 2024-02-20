@@ -1,0 +1,15 @@
+{
+    "domain": "chuck_control",
+    "version": "0.1.0",
+    "name": "Chuck Charger Control",
+    "config_flow": true,
+    "documentation": "https://github.com/TeepCo/chuck-control",
+    "issue_tracker": "https://github.com/TeepCo/chuck-control/issues",
+    "requirements": [],
+    "ssdp": [],
+    "zeroconf": [],
+    "homekit": {},
+    "dependencies": [],
+    "codeowners": ["@"],
+    "iot_class": "local_polling"
+}
