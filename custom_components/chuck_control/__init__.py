@@ -42,7 +42,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     try:
         await hass.async_add_executor_job(chargebox.update)
     except chuck_rest.ChuckRestTimeout:
-        raise PlatformNotReady(
+        raise ConfigEntryNotReady(
             f"Could not connect to chargebox {chargebox_cfg['friendly_name']} at {chargebox_cfg['base_url']}"
         )
     except chuck_rest.ChuckAuthError:
@@ -50,7 +50,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             f"Wrong username or password supplied for chargebox {chargebox_cfg['friendly_name']} at {chargebox_cfg['base_url']}"
         )
     except:
-        raise PlatformNotReady(
+        raise ConfigEntryNotReady(
             f"Unknown error connecting to chargebox {chargebox_cfg['friendly_name']} at {chargebox_cfg['base_url']}"
         )
 
