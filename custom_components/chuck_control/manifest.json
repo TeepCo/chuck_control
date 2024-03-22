@@ -1,8 +1,8 @@
 {
     "domain": "chuck_control",
     "name": "Chuck Charger Control",
-    "config_flow": true,
     "codeowners": ["@"],
+    "config_flow": true,
     "dependencies": [],
     "documentation": "https://github.com/TeepCo/chuck-control",
     "homekit": {},
