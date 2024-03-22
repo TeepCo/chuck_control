@@ -1,0 +1,16 @@
+set_max_charging_current:
+  name: set_max_charging_current
+  description: Set maximal current per phase used for Charging
+  target:
+    entity:
+      name: Connector
+      description: Connector
+      required: true
+  fields:
+    entity_id:
+      name: Connector entity id
+      required: true
+    max_charging_current:
+      name: Max charging current per phase
+      required: true
+      example: 20

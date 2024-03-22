@@ -80,7 +80,15 @@ async def async_setup_entry(
         async_add_entities(to_add)
     else:
         _LOGGER.error(f"Cannot add {chargebox}")
-
+    platform = entity_platform.async_get_current_platform()
+    platform.async_register_entity_service(
+        "set_max_charging_current",
+        {
+            vol.Required("entity_id"): cv.entity_id,
+            vol.Required("max_charging_current"): cv.positive_int,
+        },
+        "set_max_charging_current",
+    )
 
 def get_friendly_name(
     cls,
