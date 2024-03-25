@@ -4,8 +4,10 @@ set_max_charging_current:
   fields:
     entity_id:
       name: Connector entity id
+      description: Connector entity id
       required: true
     max_charging_current:
       name: Max charging current per phase
+      description: Max charging current per phase
       required: true
       example: 20
