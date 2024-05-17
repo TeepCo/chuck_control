@@ -148,11 +148,11 @@ class ChuckChargeBox:
         if auth:
             _LOGGER.debug("AUTH")
             requests.post(
-                url, json=data, auth=(self.auth_name, self.auth_pass), timeout=5
+                url, json=data, auth=(self.auth_name, self.auth_pass), timeout=7
             )
         else:
             _LOGGER.debug("NO AUTH")
-            requests.post(url, json=data, timeout=5)
+            requests.post(url, json=data, timeout=7)
 
     def get_device_info(self):
         info = {
@@ -234,9 +234,9 @@ class ChuckChargeBox:
 
     def get_current_for_connector_L(self, connector, L):
         physical_L = self.phase_order[int(connector) - 1][L - 1]
-        return self.status["connectors"][str(connector)]["packet"]["ext"][
+        return float(self.status["connectors"][str(connector)]["packet"]["ext"][
             f"crrntl{str(physical_L)}"
-        ]
+        ])
 
     def get_net_current_for_L(self, L):
         physical_L = str(L)
