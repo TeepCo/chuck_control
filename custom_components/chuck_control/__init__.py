@@ -4,7 +4,7 @@ import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, SupportsResponse
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
     ConfigEntryNotReady,
@@ -43,24 +43,34 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await hass.async_add_executor_job(chargebox.update)
     except chuck_rest.ChuckRestTimeout:
         raise ConfigEntryNotReady(
-            f"Could not connect to chargebox {chargebox_cfg['friendly_name']} at {chargebox_cfg['base_url']}"
+            f"Could not connect to chargebox {
+                chargebox_cfg['friendly_name']} at {chargebox_cfg['base_url']}"
         )
     except chuck_rest.ChuckAuthError:
         raise ConfigEntryAuthFailed(
-            f"Wrong username or password supplied for chargebox {chargebox_cfg['friendly_name']} at {chargebox_cfg['base_url']}"
+            f"Wrong username or password supplied for chargebox {
+                chargebox_cfg['friendly_name']} at {chargebox_cfg['base_url']}"
         )
     except:
         raise ConfigEntryNotReady(
-            f"Unknown error connecting to chargebox {chargebox_cfg['friendly_name']} at {chargebox_cfg['base_url']}"
+            f"Unknown error connecting to chargebox {
+                chargebox_cfg['friendly_name']} at {chargebox_cfg['base_url']}"
         )
 
     # Registers update listener to update config entry when options are updated.
-    unsub_options_update_listener = entry.add_update_listener(options_update_listener)
+    unsub_options_update_listener = entry.add_update_listener(
+        options_update_listener)
     # Store a reference to the unsubscribe function to cleanup if an entry is unloaded.
     chargebox_cfg["unsub_options_update_listener"] = unsub_options_update_listener
     chargebox_cfg.update({"chargebox": chargebox})
     hass.data[DOMAIN][entry.entry_id] = chargebox_cfg
 
+    hass.services.async_register(
+        DOMAIN,
+        "get_integration_config",
+        lambda _: entry.as_dict(),
+        supports_response=SupportsResponse.ONLY,
+    )
     # Forward the setup to the sensor platform.
     await asyncio.gather(
         *(

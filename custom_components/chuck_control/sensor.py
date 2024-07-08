@@ -1,31 +1,32 @@
+from datetime import timedelta
 import logging
 
-import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
+
 from homeassistant import config_entries, core
 from homeassistant.components.sensor import (
     PLATFORM_SCHEMA,
     SensorDeviceClass,
-    SensorStateClass,
     SensorEntity,
+    SensorStateClass,
 )
 from homeassistant.const import (
+    CONF_PASSWORD,
     CONF_URL,
     CONF_USERNAME,
-    CONF_PASSWORD,
     UnitOfElectricCurrent,
-    UnitOfPower,
     UnitOfEnergy,
+    UnitOfPower,
     UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_platform
+import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import Any
-from datetime import timedelta
-from .const import DOMAIN, CONF_HAVE_NET_CURRENT_SENSOR
 
+from .const import CONF_HAVE_NET_CURRENT_SENSOR, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -57,7 +58,6 @@ async def async_setup_entry(
     if chargebox.info:
         async_add_entities([ChargeBoxTotal(chargebox)])
         async_add_entities([ChargeBoxSessionEnergy(chargebox)])
-
         to_add = []
         for connector in range(chargebox.get_connectors_count()):
             to_add.append(ConnectorCurrent(chargebox, connector + 1))
@@ -89,6 +89,7 @@ async def async_setup_entry(
         },
         "set_max_charging_current",
     )
+
 
 def get_friendly_name(
     cls,
@@ -310,6 +311,7 @@ class ConnectorCurrent(SensorEntity):
         cid = str(self.connector_id)
         return {
             "connector_id ": self.connector_id,
+            "charger_id": self.chargebox.info['serialNumber'],
             "current_L1": self.chargebox.get_current_for_connector_L(cid, 1),
             "current_L2": self.chargebox.get_current_for_connector_L(cid, 2),
             "current_L3": self.chargebox.get_current_for_connector_L(cid, 3),
@@ -511,7 +513,8 @@ class ConnectorTotal(SensorEntity):
     @property
     def state(self) -> Any:
         return round(
-            self.chargebox.get_connector_total_energy(self.connector_id) / 1000, 2
+            self.chargebox.get_connector_total_energy(
+                self.connector_id) / 1000, 2
         )
 
     @property
@@ -549,7 +552,8 @@ class ConnectorActual(SensorEntity):
     @property
     def state(self) -> Any:
         return round(
-            self.chargebox.get_connector_session_energy(self.connector_id) / 1000, 2
+            self.chargebox.get_connector_session_energy(
+                self.connector_id) / 1000, 2
         )
 
     @property

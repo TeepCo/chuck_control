@@ -60,5 +60,23 @@
         }
       }
     }
+  },
+  "services":{
+    "set_max_charging_current":{
+      "name": "Set max charging current",
+      "description": "Set maximal current per phase used for Charging",
+      "fields":{
+      "entity_id":{
+      "name": "Connector entity id",
+      "description": "Connector entity id"
+      },
+
+      "max_charging_current":{
+        "name": "Max charging current per phase",
+        "description": "Max charging current per phase"
+      }
+
+      }
+    }
   }
 }
