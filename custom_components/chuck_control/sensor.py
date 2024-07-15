@@ -444,7 +444,7 @@ class ConnectorVoltage(SensorEntity):
 
     @property
     def entity_registry_enabled_default(self) -> bool:
-        return False
+        return True
 
 
 class ConnectorPower(SensorEntity):
@@ -625,6 +625,48 @@ class ChargeBoxSessionEnergy(SensorEntity):
     @property
     def unique_id(self) -> str:
         return f"{self.chargebox.info['serialNumber']}_energy_actual"
+
+    @property
+    def device_class(self) -> SensorDeviceClass:
+        return SensorDeviceClass.ENERGY
+
+    @property
+    def state_class(self) -> SensorStateClass:
+        return SensorStateClass.MEASUREMENT
+
+    @property
+    def unit_of_measurement(self) -> str:
+        return UnitOfEnergy.KILO_WATT_HOUR
+
+    def update(self) -> None:
+        self.chargebox.update()
+
+    @property
+    def state_attributes(self) -> dict[str, Any]:
+        return {"connector_count ": self.chargebox.get_connectors_count()}
+
+
+class ChargeBoxTotalEnergy(SensorEntity):
+    def __init__(self, chargebox) -> None:
+        self.chargebox = chargebox
+        self.friendly_name_appendix = "Total energy"
+        self.friendly_name = get_friendly_name(self)
+
+    @property
+    def name(self) -> str:
+        return self.friendly_name
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return self.chargebox.get_device_info()
+
+    @property
+    def state(self) -> Any:
+        return round(self.chargebox.get_energy_total() / 1000, 4)
+
+    @property
+    def unique_id(self) -> str:
+        return f"{self.chargebox.info['serialNumber']}_energy_total"
 
     @property
     def device_class(self) -> SensorDeviceClass:
