@@ -205,7 +205,7 @@ class ChuckChargeBox:
         _LOGGER.debug(f"SEND POST TO THIS CHARGER {connector}, {max_charging_current}")
         data = {
             "values": {f"MaxCurrent_{str(connector)}": str(max_charging_current)},
-            "persist": True,
+            "persist": False,
         }
         await self.send_command(f"{self.base_url}/api/admin/unitconfig", data)
 
