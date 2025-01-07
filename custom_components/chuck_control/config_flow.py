@@ -37,11 +37,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         config_entry: config_entries.ConfigEntry,
     ) -> config_entries.OptionsFlow:
         """Create the options flow."""
-        return OptionsFlowHandler(config_entry)
+        return ChuckOptionsFlowHandler()
 
     async def _show_setup_form(
         self, errors: dict[str, str] | None = None
-    ) -> FlowResult:
+    ) -> config_entries.ConfigFlowResult:
         """Show the setup form to the user."""
         return self.async_show_form(
             step_id="user",
@@ -76,7 +76,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> config_entries.ConfigFlowResult:
         """Handle the initial step."""
 
         if user_input is None:
@@ -108,77 +108,66 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
 
-class OptionsFlowHandler(config_entries.OptionsFlow):
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize options flow."""
-        self.config_entry = config_entry
-        self.data = self.config_entry.data
 
-    async def _show_config_form(
-        self, errors: dict[str, str] | None = None
-    ) -> FlowResult:
-        cfg = self.config_entry.data
-        return self.async_show_form(
-            step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        "friendly_name", default=cfg.get("friendly_name")
-                    ): cv.string,
-                    vol.Required("base_url", default=cfg.get("base_url")): cv.string,
-                    vol.Required("auth_user", default=cfg.get("auth_user")): cv.string,
-                    vol.Required("auth_pass", default=cfg.get("auth_pass")): cv.string,
-                    vol.Required(
-                        "cfg_phase_order_conn1",
-                        default=cfg.get("cfg_phase_order_conn1"),
-                    ): vol.In(PHASE_ORDER_DICT),
-                    vol.Required(
-                        "cfg_phase_order_conn2",
-                        default=cfg.get("cfg_phase_order_conn2"),
-                    ): vol.In(PHASE_ORDER_DICT),
-                    vol.Optional(
-                        "have_net_current_sensor",
-                        default=cfg.get("have_net_current_sensor"),
-                    ): cv.boolean,
-                    vol.Optional(
-                        "is_connected_to_ocpp",
-                        default=cfg.get("is_connected_to_ocpp"),
-                    ): cv.boolean,
-                }
-            ),
-            errors=errors,
-        )
+class ChuckOptionsFlowHandler(config_entries.OptionsFlow):
+
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> config_entries.ConfigFlowResult:
         errors = {}
+        data_schema = vol.Schema(
+            {
+                vol.Required(
+                    "friendly_name", default=self.config_entry.data.get("friendly_name")
+                ): cv.string,
+                vol.Required("base_url", default=self.config_entry.data.get("base_url")): cv.string,
+                vol.Required("auth_user", default=self.config_entry.data.get("auth_user")): cv.string,
+                vol.Required("auth_pass", default=self.config_entry.data.get("auth_pass")): cv.string,
+                vol.Required(
+                    "cfg_phase_order_conn1",
+                    default=self.config_entry.data.get("cfg_phase_order_conn1"),
+                ): vol.In(PHASE_ORDER_DICT),
+                vol.Required(
+                    "cfg_phase_order_conn2",
+                    default=self.config_entry.data.get("cfg_phase_order_conn2"),
+                ): vol.In(PHASE_ORDER_DICT),
+                vol.Optional(
+                    "have_net_current_sensor",
+                    default=self.config_entry.data.get("have_net_current_sensor"),
+                ): cv.boolean,
+                vol.Optional(
+                    "is_connected_to_ocpp",
+                    default=self.config_entry.data.get("is_connected_to_ocpp"),
+                ): cv.boolean,
+            }
+        )
         if user_input is not None:
-            self.config_entry.data = user_input
             url: str | None = user_input["base_url"]
             username: str | None = user_input["auth_user"]
             password: str | None = user_input["auth_pass"]
 
             chuckapi = ChuckChargeBox(self.hass, url, username, password)
 
+
+
             try:
                 await self.hass.async_add_executor_job(chuckapi.update)
             except ChuckAuthError:
                 errors["base"] = "invalid_auth"
-                return await self._show_config_form(errors)
+                return  self.async_show_form(data_schema=self.add_suggested_values_to_schema(data_schema,self.config_entry.options), errors=errors)
             except ChuckRestTimeout:
                 errors["base"] = "timeout"
-                return await self._show_config_form(errors)
+                return  self.async_show_form(data_schema=self.add_suggested_values_to_schema(data_schema,self.config_entry.options), errors=errors)
             except ChuckRestError as err:
                 errors["base"] = err.http_message
-                return await self._show_config_form(errors)
+                return  self.async_show_form(data_schema=self.add_suggested_values_to_schema(data_schema,self.config_entry.options), errors=errors)
 
             return self.async_create_entry(
-                title=user_input["friendly_name"],
                 data=user_input,
             )
 
-        return await self._show_config_form(errors=errors)
+        return self.async_show_form(data_schema=self.add_suggested_values_to_schema(data_schema,self.config_entry.options), errors=errors)
 
 
 class CannotConnect(HomeAssistantError):

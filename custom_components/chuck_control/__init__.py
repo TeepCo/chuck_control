@@ -71,13 +71,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         lambda _: entry.as_dict(),
         supports_response=SupportsResponse.ONLY,
     )
-    # Forward the setup to the sensor platform.
-    await asyncio.gather(
-        *(
-            hass.config_entries.async_forward_entry_setup(entry, platform)
-            for platform in PLATFORMS
-        )
-    )
+
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True
 
