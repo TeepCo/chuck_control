@@ -5,7 +5,7 @@ import voluptuous as vol
 
 from homeassistant import config_entries, core
 from homeassistant.components.sensor import (
-    PLATFORM_SCHEMA,
+    PLATFORM_SCHEMA as SENSOR_PLATFORM_SCHEMA,
     SensorDeviceClass,
     SensorEntity,
     SensorStateClass,
@@ -19,7 +19,6 @@ from homeassistant.const import (
     UnitOfPower,
     UnitOfTemperature,
 )
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_platform
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity import DeviceInfo
@@ -34,7 +33,7 @@ SCAN_INTERVAL = timedelta(seconds=2)
 DEFAULT_BASE_URL = "https://demo.evexpert.eu/demo/"
 DEFAULT_AUTH_NAME = "admin"
 DEFAULT_AUTH_PASS = "admin"
-PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
+SENSOR_PLATFORM_SCHEMA = SENSOR_PLATFORM_SCHEMA.extend(
     {
         vol.Required(CONF_URL): cv.string,
         vol.Optional(CONF_USERNAME, default=DEFAULT_AUTH_NAME): cv.string,
@@ -49,12 +48,12 @@ async def async_setup_entry(
     config_entry: config_entries.ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ):
-    """Setup sensors from a config entry created in the integrations UI."""
+    """Set up sensors from a config entry created in the integrations UI."""
     _LOGGER.debug("ASYNC SETUP ENTRY")
     chargebox_cfg = config_entry.data
     have_net_current_sensor = chargebox_cfg[CONF_HAVE_NET_CURRENT_SENSOR]
     chargebox = hass.data[DOMAIN][config_entry.entry_id]["chargebox"]
-
+    
     if chargebox.info:
         async_add_entities([ChargeBoxTotal(chargebox)])
         async_add_entities([ChargeBoxSessionEnergy(chargebox)])

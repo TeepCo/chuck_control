@@ -1,27 +1,25 @@
 """Config flow for Chuck Charger Control integration."""
 from __future__ import annotations
 
-from homeassistant import config_entries
-from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResult
-from homeassistant.exceptions import HomeAssistantError
-from homeassistant.core import callback
-import homeassistant.helpers.config_validation as cv
-
 import logging
 from typing import Any
+
 import voluptuous as vol
 
-from .chuck_rest import ChuckChargeBox, ChuckAuthError, ChuckRestError, ChuckRestTimeout
+from homeassistant import config_entries
+from homeassistant.core import callback
+from homeassistant.exceptions import HomeAssistantError
+import homeassistant.helpers.config_validation as cv
+
+from .chuck_rest import ChuckAuthError, ChuckChargeBox, ChuckRestError, ChuckRestTimeout
 from .const import (
+    CONF_DEFAULT_API_BASE_URL,
+    CONF_DEFAULT_API_PWD,
+    CONF_DEFAULT_API_USER,
     DOMAIN,
     PHASE_ORDER_DICT,
     PHASE_ORDER_DICT_DEFAULT_CFG,
-    CONF_DEFAULT_API_BASE_URL,
-    CONF_DEFAULT_API_USER,
-    CONF_DEFAULT_API_PWD,
 )
-
 
 _LOGGER = logging.getLogger(__name__)
 
