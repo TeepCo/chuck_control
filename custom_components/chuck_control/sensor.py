@@ -50,10 +50,10 @@ async def async_setup_entry(
 ):
     """Set up sensors from a config entry created in the integrations UI."""
     _LOGGER.debug("ASYNC SETUP ENTRY")
-    chargebox_cfg = config_entry.data
+    chargebox_cfg = config_entry.options
     have_net_current_sensor = chargebox_cfg[CONF_HAVE_NET_CURRENT_SENSOR]
     chargebox = hass.data[DOMAIN][config_entry.entry_id]["chargebox"]
-    
+
     if chargebox.info:
         async_add_entities([ChargeBoxTotal(chargebox)])
         async_add_entities([ChargeBoxSessionEnergy(chargebox)])

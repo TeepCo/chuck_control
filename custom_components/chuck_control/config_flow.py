@@ -102,7 +102,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_create_entry(
             title=user_input["friendly_name"],
-            data=user_input,
+            options=user_input,
+            data = {}
         )
 
 

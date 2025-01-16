@@ -23,7 +23,7 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Chuck Charger Control from a config entry."""
     hass.data.setdefault(DOMAIN, {})
-    chargebox_cfg = dict(entry.data)
+    chargebox_cfg = dict(entry.options)
     have_net_current_sensor = chargebox_cfg[CONF_HAVE_NET_CURRENT_SENSOR]
 
     chargebox = chuck_rest.ChuckChargeBox(
