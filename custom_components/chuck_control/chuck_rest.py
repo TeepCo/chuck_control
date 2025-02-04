@@ -203,7 +203,10 @@ class ChuckChargeBox:
 
     async def set_connector_max_charging_current(self, connector, max_charging_current):
         _LOGGER.debug(f"SEND POST TO THIS CHARGER {connector}, {max_charging_current}")
-        data = {"values": {f"MaxCurrent_{str(connector)}": str(max_charging_current)}}
+        data = {
+            "values": {f"MaxCurrent_{str(connector)}": str(max_charging_current)},
+            "persist": False,
+        }
         await self.send_command(f"{self.base_url}/api/admin/unitconfig", data)
 
     async def set_connector_enable_charging(self, connectorId: int, state: bool):
@@ -234,9 +237,11 @@ class ChuckChargeBox:
 
     def get_current_for_connector_L(self, connector, L):
         physical_L = self.phase_order[int(connector) - 1][L - 1]
-        return float(self.status["connectors"][str(connector)]["packet"]["ext"][
-            f"crrntl{str(physical_L)}"
-        ])
+        return float(
+            self.status["connectors"][str(connector)]["packet"]["ext"][
+                f"crrntl{str(physical_L)}"
+            ]
+        )
 
     def get_net_current_for_L(self, L):
         physical_L = str(L)

@@ -135,3 +135,5 @@ class StartTransactionButton(ButtonEntity):
     @property
     def device_info(self) -> DeviceInfo:
         return self.chargebox.get_device_info()
+
+
