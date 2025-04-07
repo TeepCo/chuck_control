@@ -1,67 +1,117 @@
 import json
+import logging
+from datetime import timedelta
+
+import aiohttp
+
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
+    DataUpdateCoordinator,
+    UpdateFailed,
+)
+from homeassistant.exceptions import ConfigEntryAuthFailed
 
 from . import DOMAIN
-from .const import PHASE_ORDER_DICT, PHASE_ORDER_DICT_DEFAULT_CFG, PHASE_ORDER
-
-import requests
-from requests.auth import HTTPBasicAuth
-import logging
-from homeassistant.core import HomeAssistant
+from .const import PHASE_ORDER, PHASE_ORDER_DICT_DEFAULT_CFG
 
 _LOGGER = logging.getLogger(__name__)
 
-DEFAULT_BASE_URL = "http://localhost/"
-DEFAULT_AUTH_NAME = "admin"
-DEFAULT_AUTH_PASS = "admin"
+# Default update interval in seconds
+UPDATE_INTERVAL = timedelta(seconds=1)
+
+
+class ChuckCoordinator(DataUpdateCoordinator):
+    """Class to manage fetching Chuck Charger data."""
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        charge_box: "ChuckChargeBox",
+        update_interval: timedelta = UPDATE_INTERVAL,
+    ) -> None:
+        """Initialize the coordinator."""
+        super().__init__(
+            hass,
+            _LOGGER,
+            name="Chuck Charger",
+            update_interval=update_interval,
+        )
+        self.charge_box = charge_box
+
+    async def _async_update_data(self):
+        """Fetch data from the Chuck Charger API."""
+        try:
+            await self.charge_box.update()
+            # Return the current state to be stored in the coordinator
+            return {
+                "status": self.charge_box.status,
+                "basic_status": self.charge_box.basic_status,
+                "info": self.charge_box.info,
+            }
+        except ChuckRestTimeout as err:
+            raise UpdateFailed(f"Error communicating with API: {err}") from err
+        except ChuckAuthError as err:
+            raise ConfigEntryAuthFailed(f"Authentication failed: {err}") from err
+        except Exception as err:
+            _LOGGER.exception("Unexpected error updating Chuck Charger")
+            raise UpdateFailed(f"Error updating Chuck Charger: {err}") from err
 
 
 async def test_connection(
     hass: HomeAssistant, baseurl: str, username: str, password: str
 ):
-    """Requests data from uri supplied"""
+    """Detect if the charging options API is available using aiohttp."""
+
+    session = hass.helpers.aiohttp_client.async_get_clientsession()
 
     url = baseurl + "/api/admin/automation/status"
 
     _LOGGER.debug(f"request to {url}")
-    timeout = 60
+    timeout = 10
+    auth = aiohttp.BasicAuth(username, password) if username and password else None
+
     try:
-        if username and password:
-            response = await hass.async_add_executor_job(
-                requests.get(
-                    url,
-                    auth=HTTPBasicAuth(username, password),
-                    timeout=timeout,
-                )
+        async with session.get(url, auth=auth, timeout=timeout) as response:
+            if response.status == 200:
+                _LOGGER.info("API detected successfully at %s", url)
+                return True
+            if response.status == 401:
+                raise ChuckAuthError("Wrong username or password supplied for Chuck API")
+            _LOGGER.warning(
+                "Charging options API at %s returned status code: %s",
+                url,
+                response.status,
             )
-        else:
-            response = await hass.async_add_executor_job(
-                requests.get(url, timeout=timeout)
-            )
-
-    except requests.exceptions.Timeout as exception:
-        raise ChuckRestTimeout("Timeout reaching Chuck API") from exception
-
-    if response.status_code == 401:
-        raise ChuckAuthError("Wrong username or password supplied for Chuck API")
-
-    return bool(response.status_code == 200)
+            return False  # API returned a non-200 status
+    except aiohttp.ClientError as err:
+        _LOGGER.warning(
+            "Error connecting to charging options API at %s: %s", url, err
+        )
+        return False  # Connection error
+    except Exception as excep:
+        _LOGGER.exception("Unexpected exception checking charging options API: %s", excep)
+        return False  # Unexpected error
 
 
 class ChuckChargeBox:
     def __init__(
         self,
         hass: HomeAssistant,
-        base_url=DEFAULT_BASE_URL,
-        auth_name=DEFAULT_AUTH_NAME,
-        auth_pass=DEFAULT_AUTH_PASS,
+        base_url,
+        auth_name,
+        auth_pass,
         have_net_current_sensor=False,
         phase_order=None,
         friendly_name=None,
     ) -> None:
         self.hass = hass
         self.base_url = base_url
-        self.auth_name = auth_name
-        self.auth_pass = auth_pass
+        self._auth = (
+            aiohttp.BasicAuth(auth_name, auth_pass)
+            if auth_name and auth_pass
+            else None
+        )
         self.friendly_name = friendly_name
         self.status = {}
         self.basic_status = {}
@@ -80,58 +130,70 @@ class ChuckChargeBox:
         self.initializing = True
         self.tmp_charging_limit = [0, 0, 0, 0]
 
-    def request_data(self, url):
-        """Requests data from uri supplied"""
+        self._session = self.hass.helpers.aiohttp_client.async_get_clientsession()
 
-        _LOGGER.debug(f"request to {url}")
-        timeout = 60
+    async def _async_request(self, url: str, method: str = "GET", data: dict = None):
+        """Make an API request."""
+        _LOGGER.debug(f"request to {url} with data {data}")
         try:
-            if self.auth_name and self.auth_pass:
-                response = requests.get(
-                    url,
-                    auth=HTTPBasicAuth(self.auth_name, self.auth_pass),
-                    timeout=timeout,
-                )
-            else:
-                response = requests.get(url, timeout=timeout)
-        except (
-            requests.exceptions.Timeout,
-            requests.exceptions.ConnectionError,
-        ) as exception:
-            raise ChuckRestTimeout("Timeout reaching Chuck API") from exception
+            async with self._session.request(
+                method, url, auth=self._auth, json=data, timeout=10
+            ) as response:
+                response.raise_for_status()
+                return await response.json() if response.status != 204 else None # 204 no content
+        except aiohttp.ClientResponseError as e:
+            if e.status == 401:
+                raise ChuckAuthError("Wrong username or password supplied for Chuck API") from e
+            if e.status == 403:
+                raise ChuckRestError("REST HTTP Error 403 - forbidden") from e
+            _LOGGER.error(f"API request failed with status {e.status}: {e}")
+            raise
+        except aiohttp.ClientError as e:
+            _LOGGER.error(f"Error during API request: {e}")
+            raise ChuckRestTimeout("Timeout reaching Chuck API") from e
+        except Exception as e:
+            _LOGGER.exception(f"Unexpected error: {e}")
+            raise
 
-        if response.status_code == 401:
-            raise ChuckAuthError("Wrong username or password supplied for Chuck API")
-
-        if response.status_code == 403:
-            raise ChuckRestError("REST HTTP Error 403 - forbidden")
-        return response
-
-    def get_status(self):
-        response = self.request_data(f"{self.base_url}/api/admin/automation/status")
-        if response.status_code == 200:
-            self.status = response.json()
-        else:
+    async def get_status(self):
+        try:
+            self.status = await self._async_request(
+                f"{self.base_url}/api/admin/automation/status"
+            )
+        except Exception as e:
             _LOGGER.warning(
-                "Unsucessful request for Chuck info, response=%s to url=%s",
-                response.status_code,
-                response.url,
+                "Unsucessful request for Chuck status: %s",
+                e,
             )
 
-    def get_basic_status(self):
-        response = self.request_data(f"{self.base_url}/api/status")
-        if response.status_code == 200:
-            self.basic_status = response.json()
-
-    def get_info(self):
-        response = self.request_data(f"{self.base_url}/api/admin/automation/info")
-        if response.status_code == 200:
-            self.info = response.json()
-        else:
+    async def get_charging_options(self):
+        try:
+            return await self._async_request(f"{self.base_url}/api/chargingOptions")
+        except Exception as e:
             _LOGGER.warning(
-                "Unsucessful request for Chuck info, response=%s to url=%s",
-                response.status_code,
-                response.url,
+                "Unsuccessful request for Chuck info: %s",
+                e,
+            )
+            return None
+
+    async def get_basic_status(self):
+        try:
+            self.basic_status = await self._async_request(f"{self.base_url}/api/status")
+        except Exception as e:
+            _LOGGER.warning(
+                "Unsuccessful request for Chuck basic_status: %s",
+                e,
+            )
+
+    async def get_info(self):
+        try:
+            self.info = await self._async_request(
+                f"{self.base_url}/api/admin/automation/info"
+            )
+        except Exception as e:
+            _LOGGER.warning(
+                "Unsuccessful request for Chuck info: %s",
+                e,
             )
 
     def get_friendly_name(self):
@@ -141,18 +203,11 @@ class ChuckChargeBox:
             return "Chargebox"
 
     async def send_command(self, url, data, auth=True):
-        await self.hass.async_add_executor_job(self.send_post, url, data, auth)
-
-    def send_post(self, url, data, auth):
-        _LOGGER.debug(f"SEND COMMAND {url}, {data}")
-        if auth:
-            _LOGGER.debug("AUTH")
-            requests.post(
-                url, json=data, auth=(self.auth_name, self.auth_pass), timeout=7
-            )
-        else:
-            _LOGGER.debug("NO AUTH")
-            requests.post(url, json=data, timeout=7)
+        try:
+            await self._async_request(url, method="POST", data=data)
+        except Exception as e:
+            _LOGGER.error(f"Failed to send command: {e}")
+            raise
 
     def get_device_info(self):
         info = {
@@ -164,25 +219,49 @@ class ChuckChargeBox:
         return info
 
     def get_connectors_count(self) -> int:
-        return len(self.status["connectors"])
+        try:
+            return len(self.status.get("connectors", {}))
+        except Exception as e:
+            _LOGGER.warning(f"Error getting connectors count: {e}")
+            return 0
 
     def get_connector_status(self, connector):
-        return self.status["connectors"][str(connector)]["status"]
+        try:
+            return self.status.get("connectors", {}).get(str(connector), {}).get("status", "unknown")
+        except Exception as e:
+            _LOGGER.warning(f"Error getting status for connector {connector}: {e}")
+            return "unknown"
 
     def get_connector_total_energy(self, connector):
-        return self.status["connectors"][str(connector)]["packet"]["totalWh"]
+        try:
+            return self.status.get("connectors", {}).get(str(connector), {}).get("packet", {}).get("totalWh", 0)
+        except Exception as e:
+            _LOGGER.warning(f"Error getting total energy for connector {connector}: {e}")
+            return 0
 
     def get_connector_session_energy(self, connector):
-        return self.status["connectors"][str(connector)]["packet"]["actualWh"]
+        try:
+            return self.status.get("connectors", {}).get(str(connector), {}).get("packet", {}).get("actualWh", 0)
+        except Exception as e:
+            _LOGGER.warning(f"Error getting session energy for connector {connector}: {e}")
+            return 0
 
     def get_phase_order_cfg(self):
         return self.phase_order
 
     def get_connector_voltage(self, connector):
-        return self.status["connectors"][str(connector)]["voltage"]
+        try:
+            return self.status.get("connectors", {}).get(str(connector), {}).get("voltage", 0)
+        except Exception as e:
+            _LOGGER.warning(f"Error getting voltage for connector {connector}: {e}")
+            return 0
 
     def get_connector_current(self, connector):
-        return self.status["connectors"][str(connector)]["current"]
+        try:
+            return self.status.get("connectors", {}).get(str(connector), {}).get("current", 0)
+        except Exception as e:
+            _LOGGER.warning(f"Error getting current for connector {connector}: {e}")
+            return 0
 
     def get_connector_power_kw(self, connector):
         return round(
@@ -193,7 +272,11 @@ class ChuckChargeBox:
         )
 
     def get_connector_max_charging_current(self, connector):
-        return self.info["config"][f"MaxCurrent_{str(connector)}"]
+        try:
+            return self.info.get("config", {}).get(f"MaxCurrent_{str(connector)}", 0)
+        except Exception as e:
+            _LOGGER.warning(f"Error getting max charging current for connector {connector}: {e}")
+            return 0
 
     def get_connector_tmp_charging_limit(self, connector):
         return self.tmp_charging_limit[int(connector) - 1]
@@ -219,9 +302,12 @@ class ChuckChargeBox:
         await self.send_command(f"{self.base_url}/api/transaction", data)
 
     def is_connector_charging_enabled(self, connectorId) -> bool:
-        return not self.status["connectors"][str(connectorId)]["status"].startswith(
-            "Un"
-        )
+        try:
+            status = self.status.get("connectors", {}).get(str(connectorId), {}).get("status", "Unknown")
+            return not status.startswith("Un")
+        except Exception as e:
+            _LOGGER.warning(f"Error checking if connector {connectorId} is enabled: {e}")
+            return False
 
     def get_energy_total(self):
         energy_total = 0
@@ -236,42 +322,72 @@ class ChuckChargeBox:
         return energy_session
 
     def get_current_for_connector_L(self, connector, L):
-        physical_L = self.phase_order[int(connector) - 1][L - 1]
-        return float(
-            self.status["connectors"][str(connector)]["packet"]["ext"][
-                f"crrntl{str(physical_L)}"
-            ]
-        )
+        try:
+            if not self.status.get("connectors") or not self.phase_order:
+                return 0.0
+
+            # Safe access to indices
+            if int(connector) <= 0 or int(connector) > len(self.phase_order):
+                return 0.0
+
+            physical_L = self.phase_order[int(connector) - 1][L - 1]
+            return float(
+                self.status.get("connectors", {})
+                .get(str(connector), {})
+                .get("packet", {})
+                .get("ext", {})
+                .get(f"crrntl{str(physical_L)}", 0)
+            )
+        except Exception as e:
+            _LOGGER.warning(f"Error getting current for connector {connector}, L{L}: {e}")
+            return 0.0
 
     def get_net_current_for_L(self, L):
-        physical_L = str(L)
-        return self.status["connectors"]["1"]["packet"]["ext"].get(
-            f"exmcl{physical_L}", 0
-        )
+        try:
+            physical_L = str(L)
+            return self.status.get("connectors", {}).get("1", {}).get("packet", {}).get("ext", {}).get(
+                f"exmcl{physical_L}", 0
+            )
+        except Exception as e:
+            _LOGGER.warning(f"Error getting net current for L{L}: {e}")
+            return 0
 
     def get_connector_charging_state(self, connector) -> str:
-        return self.status["connectors"][str(connector)]["packet"]["chargingStatus"]
+        try:
+            return self.status.get("connectors", {}).get(str(connector), {}).get("packet", {}).get("chargingStatus", "UNKNOWN")
+        except Exception as e:
+            _LOGGER.warning(f"Error getting charging state for connector {connector}: {e}")
+            return "UNKNOWN"
 
     def is_connector_charging(self, connector) -> bool:
-        return self.get_connector_charging_state(connector).startswith("CHARGING")
+        try:
+            charging_state = self.get_connector_charging_state(connector)
+            return charging_state.startswith("CHARGING") if charging_state else False
+        except Exception as e:
+            _LOGGER.warning(f"Error checking if connector {connector} is charging: {e}")
+            return False
 
     def get_auth_status(self):
         return self.status.get("authTag")
 
-    def update(self) -> None:
+    async def update(self) -> None:
         _LOGGER.debug("update all")
-        self.update_info()
-        self.update_status()
+        await self.update_info()
+        await self.update_status()
         if self.initializing:
             self.initializing = False
-            default = self.info["config"].get("MaxDefaultCurrent", 0.0)
-            self.tmp_charging_limit = [default, default, default, default]
+            if self.info and "config" in self.info: # Check if self.info and config exist
+                default = self.info["config"].get("MaxDefaultCurrent", 0.0)
+                self.tmp_charging_limit = [default, default, default, default]
+            else:
+                _LOGGER.warning("Could not retrieve config, setting default charging limit to 0")
+                self.tmp_charging_limit = [0.0, 0.0, 0.0, 0.0] # if no config, default to 0
 
-    def update_info(self) -> None:
-        self.get_info()
+    async def update_info(self) -> None:
+        await self.get_info()
 
-    def update_status(self) -> None:
-        self.get_status()
+    async def update_status(self) -> None:
+        await self.get_status()
 
 
 class ChuckRestTimeout(Exception):
@@ -287,3 +403,12 @@ class ChuckRestError(Exception):
 
     def __init__(self, http_message) -> None:
         self.http_message = http_message
+
+
+class ChuckCoordinatorEntity(CoordinatorEntity):
+    """Base class for Chuck entities that use the coordinator."""
+
+    def __init__(self, coordinator, chargebox):
+        """Initialize the entity."""
+        super().__init__(coordinator)
+        self.chargebox = chargebox

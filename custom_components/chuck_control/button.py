@@ -21,12 +21,15 @@ async def async_setup_entry(
 ):
     _LOGGER.debug("ASYNC SETUP ENTRY")
     chargebox = hass.data[DOMAIN][config_entry.entry_id]["chargebox"]
-    charger_connected_to_ocpp = config_entry.data.get("is_connected_to_ocpp")
-    to_add = get_buttons_to_add(chargebox, charger_connected_to_ocpp)
+    coordinator = hass.data[DOMAIN][config_entry.entry_id]["coordinator"]
+    charger_connected_to_ocpp = config_entry.options.get("is_connected_to_ocpp", False)
+    to_add = get_buttons_to_add(chargebox, coordinator, charger_connected_to_ocpp)
     async_add_entities(to_add)
 
 
-def get_buttons_to_add(chargebox, charger_connected_to_ocpp) -> list[ButtonEntity]:
+def get_buttons_to_add(
+    chargebox, coordinator, charger_connected_to_ocpp
+) -> list[ButtonEntity]:
     """Return HA button entities used to control the charger based on its configuration.
 
     Args:
@@ -45,95 +48,115 @@ def get_buttons_to_add(chargebox, charger_connected_to_ocpp) -> list[ButtonEntit
     """
     buttons_to_add = []
     for connector in range(chargebox.get_connectors_count()):
+        connector_id = connector + 1
         if charger_connected_to_ocpp:
             buttons_to_add.append(
-                StartTransactionButton(chargebox=chargebox, connector_id=connector + 1)
+                StartTransactionButton(
+                    chargebox=chargebox,
+                    coordinator=coordinator, # Pass coordinator
+                    connector_id=connector_id,
+                )
             )
 
         buttons_to_add.extend(
             [
-                EnableChargingButton(chargebox=chargebox, connector_id=connector + 1),
-                DisableChargingButton(chargebox=chargebox, connector_id=connector + 1),
+                EnableChargingButton(
+                    chargebox=chargebox,
+                    coordinator=coordinator, # Pass coordinator
+                    connector_id=connector_id,
+                ),
+                DisableChargingButton(
+                    chargebox=chargebox,
+                    coordinator=coordinator, # Pass coordinator
+                    connector_id=connector_id,
+                ),
             ]
         )
     return buttons_to_add
 
 
-class DisableChargingButton(ButtonEntity):
-    def __init__(self, chargebox, connector_id) -> None:
+# --- Base Button Class (Optional Refactor) ---
+# You could create a base class to avoid repeating __init__ logic
+class BaseChuckButton(ButtonEntity):
+    _attr_has_entity_name = True # Usually True for buttons unless name is set explicitly
+
+    def __init__(self, chargebox, coordinator, connector_id) -> None:
+        """Initialize the button."""
         super().__init__()
         self.chargebox = chargebox
+        self.coordinator = coordinator # Store coordinator
         self.connector_id = connector_id
-        self.friendly_name_appendix = "Disable charging"
-        self.friendly_name = get_friendly_name(self)
+        self._attr_device_info = self.chargebox.get_device_info() # Set attribute directly
 
-    async def async_press(self):
+    async def _async_press_action(self, *args, **kwargs):
+        """Placeholder for the actual action. Should be overridden."""
+        raise NotImplementedError
+
+    async def async_press(self) -> None:
+        """Handle the button press."""
+        try:
+            await self._async_press_action()
+            # Request a refresh after the action is successful
+            await self.coordinator.async_request_refresh()
+        except Exception as e:
+            _LOGGER.error(
+                "Error pressing button %s: %s", self.entity_id or self.unique_id, e
+            )
+
+
+# --- Specific Button Implementations ---
+
+class DisableChargingButton(BaseChuckButton): # Inherit from BaseChuckButton
+    def __init__(self, chargebox, coordinator, connector_id) -> None:
+        super().__init__(chargebox, coordinator, connector_id) # Call parent init
+        # self.friendly_name_appendix = "Disable charging" # Use _attr_name instead
+        # self.friendly_name = get_friendly_name(self) # Use _attr_name instead
+        self._attr_name = f"{get_friendly_name(self, phase=False)} Disable charging" # Set name attribute
+        self._attr_unique_id = f"{self.chargebox.info['serialNumber']}_connector_{self.connector_id}_disable_charging" # Set unique_id attribute
+        self._attr_icon = "mdi:stop-circle-outline" # Suggest an icon
+
+    async def _async_press_action(self): # Implement specific action
+        """Disable charging for the connector."""
         await self.chargebox.set_connector_enable_charging(
             connectorId=self.connector_id, state=False
         )
 
-    @property
-    def unique_id(self) -> str:
-        return f"{self.chargebox.info['serialNumber']}_connector_{self.connector_id}_disable_charging"
-
-    @property
-    def name(self) -> str:
-        return self.friendly_name
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        return self.chargebox.get_device_info()
+    # Properties unique_id, name, device_info are handled by base class or attributes
 
 
-class EnableChargingButton(ButtonEntity):
-    def __init__(self, chargebox, connector_id) -> None:
-        super().__init__()
-        self.chargebox = chargebox
-        self.connector_id = connector_id
-        self.friendly_name_appendix = "Enable charging"
-        self.friendly_name = get_friendly_name(self)
+class EnableChargingButton(BaseChuckButton): # Inherit from BaseChuckButton
+    def __init__(self, chargebox, coordinator, connector_id) -> None:
+        super().__init__(chargebox, coordinator, connector_id) # Call parent init
+        # self.friendly_name_appendix = "Enable charging"
+        # self.friendly_name = get_friendly_name(self)
+        self._attr_name = f"{get_friendly_name(self, phase=False)} Enable charging" # Set name attribute
+        self._attr_unique_id = f"{self.chargebox.info['serialNumber']}_connector_{self.connector_id}_enable_charging" # Set unique_id attribute
+        self._attr_icon = "mdi:play-circle-outline" # Suggest an icon
 
-    async def async_press(self):
+    async def _async_press_action(self): # Implement specific action
+        """Enable charging for the connector."""
         await self.chargebox.set_connector_enable_charging(
             connectorId=self.connector_id, state=True
         )
 
-    @property
-    def unique_id(self) -> str:
-        return f"{self.chargebox.info['serialNumber']}_connector_{self.connector_id}_enable_charging"
-
-    @property
-    def name(self) -> str:
-        return self.friendly_name
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        return self.chargebox.get_device_info()
+    # Properties unique_id, name, device_info are handled by base class or attributes
 
 
-class StartTransactionButton(ButtonEntity):
-    def __init__(self, chargebox, connector_id) -> None:
-        super().__init__()
-        self.chargebox = chargebox
-        self.connector_id = connector_id
-        self.friendly_name_appendix = "Start transcation"
-        self.friendly_name = get_friendly_name(self)
+class StartTransactionButton(BaseChuckButton): # Inherit from BaseChuckButton
+    def __init__(self, chargebox, coordinator, connector_id) -> None:
+        super().__init__(chargebox, coordinator, connector_id) # Call parent init
+        # self.friendly_name_appendix = "Start transcation"
+        # self.friendly_name = get_friendly_name(self)
+        self._attr_name = f"{get_friendly_name(self, phase=False)} Start Transaction" # Set name attribute
+        self._attr_unique_id = f"{self.chargebox.info['serialNumber']}_connector_{self.connector_id}_transcation_start" # Set unique_id attribute
+        self._attr_icon = "mdi:play-box-outline" # Suggest an icon
 
-    async def async_press(self):
+
+    async def _async_press_action(self): # Implement specific action
+        """Start a charging transaction (for OCPP mode)."""
+        # Assuming 'Start' is the correct action string for your API
         await self.chargebox.set_connector_charging_start(
             action="Start", connector=self.connector_id
         )
 
-    @property
-    def unique_id(self) -> str:
-        return f"{self.chargebox.info['serialNumber']}_connector_{self.connector_id}_transcation_start"
-
-    @property
-    def name(self) -> str:
-        return self.friendly_name
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        return self.chargebox.get_device_info()
-
-
+    # Properties unique_id, name, device_info are handled by base class or attributes
