@@ -1,7 +1,6 @@
 from homeassistant.components.button import ButtonEntity, ButtonDeviceClass
 from homeassistant import config_entries, core
 from homeassistant.components.button import ButtonEntity, ButtonDeviceClass
-from homeassistant.const import *
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 

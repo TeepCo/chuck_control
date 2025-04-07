@@ -17,6 +17,7 @@ from homeassistant.const import (
     CONF_URL,
     CONF_USERNAME,
     UnitOfElectricCurrent,
+    UnitOfElectricPotential,
     UnitOfEnergy,
     UnitOfPower,
     UnitOfTemperature,
@@ -514,17 +515,19 @@ class ConnectorCurrentPhase(BaseChuckEntity):
                 return 0.0
 
             physical_L = self.chargebox.phase_order[int(connector) - 1][L - 1]
-            return get_data(
-                self.coordinator.data,
-                [
-                    "status",
-                    "connectors",
-                    str(connector),
-                    "packet",
-                    "ext",
-                    f"crrntl{str(physical_L)}",
-                ],
-                0,
+            return float(
+                get_data(
+                    self.coordinator.data,
+                    [
+                        "status",
+                        "connectors",
+                        str(connector),
+                        "packet",
+                        "ext",
+                        f"crrntl{str(physical_L)}",
+                    ],
+                    0,
+                )
             )
         except Exception as e:
             _LOGGER.warning(
@@ -538,6 +541,7 @@ class ConnectorVoltage(BaseChuckEntity):
 
     _attr_device_class = SensorDeviceClass.VOLTAGE
     _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
     _attr_entity_registry_enabled_default = True
 
     def __init__(self, chargebox, coordinator, connector_id) -> None:
@@ -625,9 +629,9 @@ class ConnectorTotal(BaseChuckEntity):
 class ConnectorActual(BaseChuckEntity):
     """Connector actual energy sensor."""
 
-    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_device_class = SensorDeviceClass.POWER
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+    _attr_native_unit_of_measurement = UnitOfPower.KILO_WATT
 
     def __init__(self, chargebox, coordinator, connector_id) -> None:
         """Initialize the sensor."""
@@ -679,7 +683,7 @@ class ChargeBoxSessionEnergy(BaseChuckEntity):
     """Chargebox session energy sensor."""
 
     _attr_device_class = SensorDeviceClass.ENERGY
-    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
 
     def __init__(self, chargebox, coordinator) -> None:

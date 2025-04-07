@@ -11,6 +11,7 @@ from homeassistant.helpers.update_coordinator import (
     UpdateFailed,
 )
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from . import DOMAIN
 from .const import PHASE_ORDER, PHASE_ORDER_DICT_DEFAULT_CFG
@@ -130,7 +131,7 @@ class ChuckChargeBox:
         self.initializing = True
         self.tmp_charging_limit = [0, 0, 0, 0]
 
-        self._session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+        self._session = async_get_clientsession(self.hass)
 
     async def _async_request(self, url: str, method: str = "GET", data: dict = None):
         """Make an API request."""
@@ -165,16 +166,6 @@ class ChuckChargeBox:
                 "Unsucessful request for Chuck status: %s",
                 e,
             )
-
-    async def get_charging_options(self):
-        try:
-            return await self._async_request(f"{self.base_url}/api/chargingOptions")
-        except Exception as e:
-            _LOGGER.warning(
-                "Unsuccessful request for Chuck info: %s",
-                e,
-            )
-            return None
 
     async def get_basic_status(self):
         try:
