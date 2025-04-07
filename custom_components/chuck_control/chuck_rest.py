@@ -78,7 +78,9 @@ async def test_connection(
                 _LOGGER.info("API detected successfully at %s", url)
                 return True
             if response.status == 401:
-                raise ChuckAuthError("Wrong username or password supplied for Chuck API")
+                raise ChuckAuthError(
+                    "Wrong username or password supplied for Chuck API"
+                )
             _LOGGER.warning(
                 "Charging options API at %s returned status code: %s",
                 url,
@@ -86,12 +88,12 @@ async def test_connection(
             )
             return False  # API returned a non-200 status
     except aiohttp.ClientError as err:
-        _LOGGER.warning(
-            "Error connecting to charging options API at %s: %s", url, err
-        )
+        _LOGGER.warning("Error connecting to charging options API at %s: %s", url, err)
         return False  # Connection error
     except Exception as excep:
-        _LOGGER.exception("Unexpected exception checking charging options API: %s", excep)
+        _LOGGER.exception(
+            "Unexpected exception checking charging options API: %s", excep
+        )
         return False  # Unexpected error
 
 
@@ -109,9 +111,7 @@ class ChuckChargeBox:
         self.hass = hass
         self.base_url = base_url
         self._auth = (
-            aiohttp.BasicAuth(auth_name, auth_pass)
-            if auth_name and auth_pass
-            else None
+            aiohttp.BasicAuth(auth_name, auth_pass) if auth_name and auth_pass else None
         )
         self.friendly_name = friendly_name
         self.status = {}
@@ -141,10 +141,14 @@ class ChuckChargeBox:
                 method, url, auth=self._auth, json=data, timeout=10
             ) as response:
                 response.raise_for_status()
-                return await response.json() if response.status != 204 else None # 204 no content
+                return (
+                    await response.json() if response.status != 204 else None
+                )  # 204 no content
         except aiohttp.ClientResponseError as e:
             if e.status == 401:
-                raise ChuckAuthError("Wrong username or password supplied for Chuck API") from e
+                raise ChuckAuthError(
+                    "Wrong username or password supplied for Chuck API"
+                ) from e
             if e.status == 403:
                 raise ChuckRestError("REST HTTP Error 403 - forbidden") from e
             _LOGGER.error(f"API request failed with status {e.status}: {e}")
@@ -166,6 +170,16 @@ class ChuckChargeBox:
                 "Unsucessful request for Chuck status: %s",
                 e,
             )
+
+    async def get_charging_options(self):
+        try:
+            return await self._async_request(f"{self.base_url}/api/chargingOptions")
+        except Exception as e:
+            _LOGGER.warning(
+                "Unsuccessful request for Chuck info: %s",
+                e,
+            )
+            return None
 
     async def get_basic_status(self):
         try:
@@ -218,23 +232,41 @@ class ChuckChargeBox:
 
     def get_connector_status(self, connector):
         try:
-            return self.status.get("connectors", {}).get(str(connector), {}).get("status", "unknown")
+            return (
+                self.status.get("connectors", {})
+                .get(str(connector), {})
+                .get("status", "unknown")
+            )
         except Exception as e:
             _LOGGER.warning(f"Error getting status for connector {connector}: {e}")
             return "unknown"
 
     def get_connector_total_energy(self, connector):
         try:
-            return self.status.get("connectors", {}).get(str(connector), {}).get("packet", {}).get("totalWh", 0)
+            return (
+                self.status.get("connectors", {})
+                .get(str(connector), {})
+                .get("packet", {})
+                .get("totalWh", 0)
+            )
         except Exception as e:
-            _LOGGER.warning(f"Error getting total energy for connector {connector}: {e}")
+            _LOGGER.warning(
+                f"Error getting total energy for connector {connector}: {e}"
+            )
             return 0
 
     def get_connector_session_energy(self, connector):
         try:
-            return self.status.get("connectors", {}).get(str(connector), {}).get("packet", {}).get("actualWh", 0)
+            return (
+                self.status.get("connectors", {})
+                .get(str(connector), {})
+                .get("packet", {})
+                .get("actualWh", 0)
+            )
         except Exception as e:
-            _LOGGER.warning(f"Error getting session energy for connector {connector}: {e}")
+            _LOGGER.warning(
+                f"Error getting session energy for connector {connector}: {e}"
+            )
             return 0
 
     def get_phase_order_cfg(self):
@@ -242,14 +274,22 @@ class ChuckChargeBox:
 
     def get_connector_voltage(self, connector):
         try:
-            return self.status.get("connectors", {}).get(str(connector), {}).get("voltage", 0)
+            return (
+                self.status.get("connectors", {})
+                .get(str(connector), {})
+                .get("voltage", 0)
+            )
         except Exception as e:
             _LOGGER.warning(f"Error getting voltage for connector {connector}: {e}")
             return 0
 
     def get_connector_current(self, connector):
         try:
-            return self.status.get("connectors", {}).get(str(connector), {}).get("current", 0)
+            return (
+                self.status.get("connectors", {})
+                .get(str(connector), {})
+                .get("current", 0)
+            )
         except Exception as e:
             _LOGGER.warning(f"Error getting current for connector {connector}: {e}")
             return 0
@@ -266,7 +306,9 @@ class ChuckChargeBox:
         try:
             return self.info.get("config", {}).get(f"MaxCurrent_{str(connector)}", 0)
         except Exception as e:
-            _LOGGER.warning(f"Error getting max charging current for connector {connector}: {e}")
+            _LOGGER.warning(
+                f"Error getting max charging current for connector {connector}: {e}"
+            )
             return 0
 
     def get_connector_tmp_charging_limit(self, connector):
@@ -294,10 +336,16 @@ class ChuckChargeBox:
 
     def is_connector_charging_enabled(self, connectorId) -> bool:
         try:
-            status = self.status.get("connectors", {}).get(str(connectorId), {}).get("status", "Unknown")
+            status = (
+                self.status.get("connectors", {})
+                .get(str(connectorId), {})
+                .get("status", "Unknown")
+            )
             return not status.startswith("Un")
         except Exception as e:
-            _LOGGER.warning(f"Error checking if connector {connectorId} is enabled: {e}")
+            _LOGGER.warning(
+                f"Error checking if connector {connectorId} is enabled: {e}"
+            )
             return False
 
     def get_energy_total(self):
@@ -330,14 +378,20 @@ class ChuckChargeBox:
                 .get(f"crrntl{str(physical_L)}", 0)
             )
         except Exception as e:
-            _LOGGER.warning(f"Error getting current for connector {connector}, L{L}: {e}")
+            _LOGGER.warning(
+                f"Error getting current for connector {connector}, L{L}: {e}"
+            )
             return 0.0
 
     def get_net_current_for_L(self, L):
         try:
             physical_L = str(L)
-            return self.status.get("connectors", {}).get("1", {}).get("packet", {}).get("ext", {}).get(
-                f"exmcl{physical_L}", 0
+            return (
+                self.status.get("connectors", {})
+                .get("1", {})
+                .get("packet", {})
+                .get("ext", {})
+                .get(f"exmcl{physical_L}", 0)
             )
         except Exception as e:
             _LOGGER.warning(f"Error getting net current for L{L}: {e}")
@@ -345,9 +399,16 @@ class ChuckChargeBox:
 
     def get_connector_charging_state(self, connector) -> str:
         try:
-            return self.status.get("connectors", {}).get(str(connector), {}).get("packet", {}).get("chargingStatus", "UNKNOWN")
+            return (
+                self.status.get("connectors", {})
+                .get(str(connector), {})
+                .get("packet", {})
+                .get("chargingStatus", "UNKNOWN")
+            )
         except Exception as e:
-            _LOGGER.warning(f"Error getting charging state for connector {connector}: {e}")
+            _LOGGER.warning(
+                f"Error getting charging state for connector {connector}: {e}"
+            )
             return "UNKNOWN"
 
     def is_connector_charging(self, connector) -> bool:
@@ -367,12 +428,21 @@ class ChuckChargeBox:
         await self.update_status()
         if self.initializing:
             self.initializing = False
-            if self.info and "config" in self.info: # Check if self.info and config exist
+            if (
+                self.info and "config" in self.info
+            ):  # Check if self.info and config exist
                 default = self.info["config"].get("MaxDefaultCurrent", 0.0)
                 self.tmp_charging_limit = [default, default, default, default]
             else:
-                _LOGGER.warning("Could not retrieve config, setting default charging limit to 0")
-                self.tmp_charging_limit = [0.0, 0.0, 0.0, 0.0] # if no config, default to 0
+                _LOGGER.warning(
+                    "Could not retrieve config, setting default charging limit to 0"
+                )
+                self.tmp_charging_limit = [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                ]  # if no config, default to 0
 
     async def update_info(self) -> None:
         await self.get_info()
