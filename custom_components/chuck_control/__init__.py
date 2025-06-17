@@ -18,6 +18,7 @@ import logging
 import asyncio
 from . import chuck_rest
 from .sensor import async_aiohttp_api_response
+
 # Define platforms to set up
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BUTTON]
 
@@ -75,7 +76,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not await async_aiohttp_api_response(hass, f"{chargebox.base_url}/api/status"):
         raise ConfigEntryNotReady
 
-
     # Registers update listener to update config entry when options are updated.
     unsub_options_update_listener = entry.add_update_listener(options_update_listener)
 
@@ -95,6 +95,37 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "get_integration_config",
         lambda service_call: entry.as_dict(),
         supports_response=SupportsResponse.ONLY,
+    )
+
+    async def update_unitconfig_data(service):
+        if "values" not in service.data:
+            _LOGGER.error(
+                "Service call 'update_unitconfig_data' requires 'values' parameter"
+            )
+            return
+        if "persist" not in service.data:
+            _LOGGER.error(
+                "Service call 'update_unitconfig_data' requires 'persist' parameter"
+            )
+            return
+        values = service.data["values"]
+        persist = service.data["persist"]
+        if not isinstance(values, dict):
+            _LOGGER.error(
+                "Service call 'update_unitconfig_data' requires 'values' to be a dictionary"
+            )
+            return
+        if not isinstance(persist, bool):
+            _LOGGER.error(
+                "Service call 'update_unitconfig_data' requires 'persist' to be a boolean"
+            )
+            return
+        await chargebox.set_unitconfig_values(values, persist=persist)
+
+    hass.services.async_register(
+        DOMAIN,
+        "update_unitconfig_data",
+        update_unitconfig_data,
     )
 
     # Set up all platforms

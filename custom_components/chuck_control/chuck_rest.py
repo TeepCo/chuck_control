@@ -317,13 +317,20 @@ class ChuckChargeBox:
     def set_connector_tmp_charging_limit(self, connector, value):
         self.tmp_charging_limit[int(connector) - 1] = value
 
-    async def set_connector_max_charging_current(self, connector, max_charging_current):
-        _LOGGER.debug(f"SEND POST TO THIS CHARGER {connector}, {max_charging_current}")
-        data = {
-            "values": {f"MaxCurrent_{str(connector)}": str(max_charging_current)},
-            "persist": False,
-        }
+    async def set_unitconfig_values(self, data: dict, persist: bool = False):
+        """Set a value in the unit configuration."""
+        _LOGGER.debug(f"SEND POST TO THIS CHARGER {data}")
+        data = {"values": data, "persist": persist}
         await self.send_command(f"{self.base_url}/api/admin/unitconfig", data)
+
+    async def set_charger_phase_mode(self, phase_mode: int):
+        """Set the phase mode for the charger."""
+        data = {"ForcePhaseCharging": phase_mode}
+        await self.set_unitconfig_values(data, persist=True)
+
+    async def set_connector_max_charging_current(self, connector, max_charging_current):
+        data = {f"MaxCurrent_{str(connector)}": str(max_charging_current)}
+        await self.set_unitconfig_values(data)
 
     async def set_connector_enable_charging(self, connectorId: int, state: bool):
         _LOGGER.debug(f"Set connector {connectorId} to state {state}")
