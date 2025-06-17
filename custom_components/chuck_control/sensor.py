@@ -150,7 +150,7 @@ def get_friendly_name(
     charger_name: bool = True,
     charger_serial: bool = False,
     connector: bool = True,
-    phase: bool = True,
+    phase: bool = False,
 ):
     name = ""
     if charger_name and hasattr(cls, "chargebox"):
@@ -248,7 +248,7 @@ class NetCurrentPhaseSensor(BaseChuckEntity):
         """Initialize the sensor."""
         super().__init__(chargebox, coordinator, phase_number=phase_number)
         self.friendly_name_appendix = "Net current"
-        self._attr_name = get_friendly_name(self)
+        self._attr_name = get_friendly_name(self,phase=True,connector=False)
         self._attr_unique_id = (
             f"{self.chargebox.info['serialNumber']}_L{self.phase_number}_net_current"
         )
@@ -483,7 +483,7 @@ class ConnectorCurrentPhase(BaseChuckEntity):
             chargebox, coordinator, connector_id=connector_id, phase_number=phase_number
         )
         self.friendly_name_appendix = "Current"
-        self._attr_name = get_friendly_name(self)
+        self._attr_name = get_friendly_name(self,phase=True)
         self._attr_unique_id = f"{self.chargebox.info['serialNumber']}_connector_{self.connector_id}_phase_{self.phase_number}_current_"
 
     @property
@@ -665,7 +665,7 @@ class ChargeBoxTotal(BaseChuckEntity):
         """Initialize the sensor."""
         super().__init__(chargebox, coordinator)
         self.friendly_name_appendix = "Total energy"
-        self._attr_name = get_friendly_name(self)
+        self._attr_name = get_friendly_name(self,connector=False)
         self._attr_unique_id = f"{self.chargebox.info['serialNumber']}_energy_total"
 
     @property
@@ -690,7 +690,7 @@ class ChargeBoxSessionEnergy(BaseChuckEntity):
         """Initialize the sensor."""
         super().__init__(chargebox, coordinator)
         self.friendly_name_appendix = "Actual energy"
-        self._attr_name = get_friendly_name(self)
+        self._attr_name = get_friendly_name(self,connector=False)
         self._attr_unique_id = f"{self.chargebox.info['serialNumber']}_energy_actual"
 
     @property
@@ -747,7 +747,7 @@ class ChargingOptions(BaseChuckEntity):
         """Initialize the sensor."""
         super().__init__(chargebox, coordinator)
         self.friendly_name_appendix = "Charging options"
-        self._attr_name = get_friendly_name(self)
+        self._attr_name = get_friendly_name(self,connector=False)
         self._attr_unique_id = f"{self.chargebox.info['serialNumber']}_charging_options"
         self._attr_native_value = "UNSUPPORTED"
 
