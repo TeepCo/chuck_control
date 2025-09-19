@@ -629,9 +629,9 @@ class ConnectorTotal(BaseChuckEntity):
 class ConnectorActual(BaseChuckEntity):
     """Connector actual energy sensor."""
 
-    _attr_device_class = SensorDeviceClass.POWER
+    _attr_device_class = SensorDeviceClass.ENERGY
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_unit_of_measurement = UnitOfPower.KILO_WATT
+    _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
 
     def __init__(self, chargebox, coordinator, connector_id) -> None:
         """Initialize the sensor."""
